@@ -1,6 +1,9 @@
 package org.example.authservice.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class RefreshTokenRequest {
+    @NotBlank
     private String refreshToken;
 
     public String getRefreshToken() {
@@ -11,4 +14,3 @@ public class RefreshTokenRequest {
         this.refreshToken = refreshToken;
     }
 }
-
