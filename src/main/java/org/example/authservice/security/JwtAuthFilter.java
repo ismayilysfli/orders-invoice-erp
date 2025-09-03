@@ -15,12 +15,16 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.JwtException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
@@ -54,7 +58,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if(authHeader != null && authHeader.startsWith("Bearer ")){
             String token = authHeader.substring(7);
             try {
-                if(!jwtService.isRefreshToken(token)) { // only access tokens authenticate
+                if(jwtService.isAccessToken(token)) { // only access tokens authenticate
                     String email = jwtService.extractEmail(token);
                     if(email != null && SecurityContextHolder.getContext().getAuthentication() == null){
                         User user = userRepository.findByEmail(email);
@@ -67,7 +71,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         }
                     }
                 }
-            } catch (JwtException | IllegalArgumentException ignored){
+            } catch (JwtException | IllegalArgumentException ex){
+                log.debug("JWT processing failed: {}", ex.getMessage());
             }
         }
         filterChain.doFilter(request, response);
