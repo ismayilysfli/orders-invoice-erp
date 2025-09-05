@@ -1,4 +1,4 @@
-package org.example.authservice.exception;
+package org.example.inventoryservice.exception;
 
 import org.springframework.http.HttpStatus;
 
