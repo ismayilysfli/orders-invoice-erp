@@ -14,6 +14,7 @@
     <modules>
         <module>auth-service</module>
         <module>InventoryService</module>
+        <module>OrderService</module>
     </modules>
 
     <properties>
