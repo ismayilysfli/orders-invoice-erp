@@ -56,7 +56,7 @@
         }
         public void deleteProduct(Long id) {
             if(!productRepository.existsById(id)){
-                throw new ResourceNotFoundException("Product with ID " + id + " not found");
+                throw new ResourceNotFoundException("Product with ID " + id + " not found ");
             }
             productRepository.deleteById(id);
             log.info("Product with ID: {} deleted successfully", id);
