@@ -13,7 +13,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.util.Assert;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -83,6 +88,57 @@ public class ProductService{
         Product updated = productRepository.save(product);
         log.info("Decremented stock for product {} by {}, new stock {}", id, qty, updated.getStockQty());
         return mapToProductResponse(updated);
+    }
+
+    public int importProducts(MultipartFile file) {
+        int imported = 0;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            int lineNo = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNo++;
+                if (line.trim().isEmpty()) continue;
+                // optional header skip if first line contains non-numeric price
+                if (lineNo == 1 && line.toLowerCase().contains("name") && line.toLowerCase().contains("sku")) {
+                    continue; // skip header
+                }
+                String[] parts = line.split(",");
+                if (parts.length < 4) {
+                    log.warn("Skipping malformed line {}: {}", lineNo, line);
+                    continue;
+                }
+                String name = parts[0].trim();
+                String sku = parts[1].trim();
+                String priceStr = parts[2].trim();
+                String stockStr = parts[3].trim();
+                try {
+                    BigDecimal price = new BigDecimal(priceStr);
+                    int stock = Integer.parseInt(stockStr);
+                    if (sku.isEmpty()) {
+                        log.warn("Skipping line {} empty sku", lineNo);
+                        continue;
+                    }
+                    if (productRepository.findBySku(sku).isPresent()) {
+                        // skip duplicates (could update instead)
+                        log.info("Duplicate SKU {} skipped", sku);
+                        continue;
+                    }
+                    Product p = new Product();
+                    p.setName(name);
+                    p.setSku(sku);
+                    p.setPrice(price);
+                    p.setStockQty(stock);
+                    productRepository.save(p);
+                    imported++;
+                } catch (Exception ex) {
+                    log.warn("Skipping line {} parse error: {}", lineNo, ex.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to import products: " + e.getMessage(), e);
+        }
+        log.info("Imported {} products from file {}", imported, file.getOriginalFilename());
+        return imported;
     }
 
     private Product mapToProduct(ProductRequest productRequest) {

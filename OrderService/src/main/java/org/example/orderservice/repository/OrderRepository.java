@@ -27,4 +27,45 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findOrdersWithTotalGreaterThan(@Param("amount") BigDecimal amount);
 
     List<Order> findByCustomerIdAndStatus(String customerId, OrderStatus status);
+
+    // Monthly sales aggregation native query
+    @Query(value = """
+            SELECT EXTRACT(YEAR FROM o.order_date)  AS year,
+                   EXTRACT(MONTH FROM o.order_date) AS month,
+                   SUM(o.total_amount)             AS totalSales,
+                   COUNT(*)                        AS orderCount,
+                   AVG(o.total_amount)             AS avgOrderValue
+            FROM orders o
+            WHERE EXTRACT(YEAR FROM o.order_date) = :year
+            GROUP BY year, month
+            ORDER BY month
+            """, nativeQuery = true)
+    List<MonthlySalesRow> monthlySales(@Param("year") int year);
+
+    interface MonthlySalesRow {
+        Integer getYear();
+        Integer getMonth();
+        BigDecimal getTotalSales();
+        Long getOrderCount();
+        BigDecimal getAvgOrderValue();
+    }
+
+    @Query(value = """
+            SELECT oi.product_id        AS productId,
+                   SUM(oi.quantity)     AS totalQuantity,
+                   SUM(oi.subtotal)     AS totalRevenue
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            WHERE EXTRACT(YEAR FROM o.order_date) = :year
+            GROUP BY oi.product_id
+            ORDER BY totalRevenue DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<TopProductRow> topProducts(@Param("year") int year, @Param("limit") int limit);
+
+    interface TopProductRow {
+        Long getProductId();
+        Long getTotalQuantity();
+        BigDecimal getTotalRevenue();
+    }
 }

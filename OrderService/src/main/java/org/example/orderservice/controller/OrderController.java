@@ -37,6 +37,7 @@ public class OrderController {
     public ResponseEntity<FileSystemResource> downloadInvoice(@PathVariable Long id) {
         OrderResponse order = orderService.getOrderById(id);
         String path = pdfService.generateInvoicePdf(order);
+        orderService.recordInvoiceGenerated(order, path);
         File file = new File(path);
         if (!file.exists()) {
             return ResponseEntity.notFound().build();

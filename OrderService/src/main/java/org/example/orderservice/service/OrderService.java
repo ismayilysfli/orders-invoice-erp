@@ -19,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -27,13 +28,16 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final RestTemplate restTemplate;
     private final String inventoryBaseUrl;
+    private final OrderEventService orderEventService;
 
     public OrderService(OrderRepository orderRepository,
                         RestTemplate restTemplate,
-                        @Value("${inventory.base-url}") String inventoryBaseUrl) {
+                        @Value("${inventory.base-url}") String inventoryBaseUrl,
+                        OrderEventService orderEventService) {
         this.orderRepository = orderRepository;
         this.restTemplate = restTemplate;
         this.inventoryBaseUrl = inventoryBaseUrl;
+        this.orderEventService = orderEventService;
     }
 
     public OrderResponse createOrder(OrderRequest orderRequest) {
@@ -46,10 +50,8 @@ public class OrderService {
         order.setCustomerId(orderRequest.getCustomerId());
         order.setStatus(OrderStatus.PENDING);
 
-        // Decrement stock for each item first; if any fails, the whole call fails
         for (OrderItemRequest itemRequest : orderRequest.getItems()) {
-            decrementStock(itemRequest.getProductId(), itemRequest.getQuantity());
-            BigDecimal price = getMockPrice(itemRequest.getProductId());
+            BigDecimal price = decrementStockAndGetPrice(itemRequest.getProductId(), itemRequest.getQuantity());
             OrderItem item = new OrderItem(
                     itemRequest.getProductId(),
                     itemRequest.getQuantity(),
@@ -59,13 +61,19 @@ public class OrderService {
         }
 
         Order savedOrder = orderRepository.save(order);
+        orderEventService.recordOrderCreated(savedOrder);
         return convertToResponse(savedOrder);
     }
 
-    private void decrementStock(Long productId, int qty) {
+    private BigDecimal decrementStockAndGetPrice(Long productId, int qty) {
         try {
             String url = inventoryBaseUrl + "/api/products/{id}/decrement?qty={qty}";
-            ResponseEntity<Void> res = restTemplate.postForEntity(url, null, Void.class, productId, qty);
+            ResponseEntity<Map> res = restTemplate.postForEntity(url, null, Map.class, productId, qty);
+            if (res.getStatusCode().is2xxSuccessful() && res.getBody() != null) {
+                Object priceObj = res.getBody().get("price");
+                if (priceObj != null) return new BigDecimal(priceObj.toString());
+            }
+            throw new InvalidOrderException("Could not obtain price for product " + productId);
         } catch (HttpClientErrorException e) {
             String msg = e.getResponseBodyAsString();
             throw new InvalidOrderException("Failed to reserve stock for product " + productId + ": " + msg);
@@ -108,8 +116,9 @@ public class OrderService {
         return "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
-    private BigDecimal getMockPrice(Long productId) {
-        return BigDecimal.valueOf(9.99);
+
+    public void recordInvoiceGenerated(OrderResponse orderResponse, String pdfPath) {
+        orderEventService.recordInvoiceGenerated(orderResponse.getId(), orderResponse.getOrderNumber(), pdfPath, orderResponse.getTotalAmount());
     }
 
     private OrderResponse convertToResponse(Order order) {

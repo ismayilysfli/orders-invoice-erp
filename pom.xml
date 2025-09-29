@@ -21,6 +21,7 @@
         <module>InventoryService</module>
         <module>OrderService</module>
         <module>APIGateway</module>
+        <module>ReportService</module>
     </modules>
 
     <properties>

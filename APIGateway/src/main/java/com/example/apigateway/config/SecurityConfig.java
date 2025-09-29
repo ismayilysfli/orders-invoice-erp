@@ -20,7 +20,7 @@ public class SecurityConfig {
                         String path = p.trim();
                         if (!path.isEmpty()) reg.pathMatchers(path).permitAll();
                     }
-                    reg.anyExchange().permitAll();
+                    reg.anyExchange().authenticated();
                 });
         return http.build();
     }
