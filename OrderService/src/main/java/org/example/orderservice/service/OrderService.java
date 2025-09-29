@@ -1,4 +1,4 @@
-package org.example.orderservice.Service;
+package org.example.orderservice.service;
 
 import jakarta.transaction.Transactional;
 import org.example.orderservice.dto.OrderItemRequest;
@@ -11,7 +11,11 @@ import org.example.orderservice.model.Order;
 import org.example.orderservice.model.OrderItem;
 import org.example.orderservice.model.OrderStatus;
 import org.example.orderservice.repository.OrderRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,9 +25,15 @@ import java.util.UUID;
 @Transactional
 public class OrderService {
     private final OrderRepository orderRepository;
+    private final RestTemplate restTemplate;
+    private final String inventoryBaseUrl;
 
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(OrderRepository orderRepository,
+                        RestTemplate restTemplate,
+                        @Value("${inventory.base-url}") String inventoryBaseUrl) {
         this.orderRepository = orderRepository;
+        this.restTemplate = restTemplate;
+        this.inventoryBaseUrl = inventoryBaseUrl;
     }
 
     public OrderResponse createOrder(OrderRequest orderRequest) {
@@ -36,7 +46,9 @@ public class OrderService {
         order.setCustomerId(orderRequest.getCustomerId());
         order.setStatus(OrderStatus.PENDING);
 
+        // Decrement stock for each item first; if any fails, the whole call fails
         for (OrderItemRequest itemRequest : orderRequest.getItems()) {
+            decrementStock(itemRequest.getProductId(), itemRequest.getQuantity());
             BigDecimal price = getMockPrice(itemRequest.getProductId());
             OrderItem item = new OrderItem(
                     itemRequest.getProductId(),
@@ -48,6 +60,16 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
         return convertToResponse(savedOrder);
+    }
+
+    private void decrementStock(Long productId, int qty) {
+        try {
+            String url = inventoryBaseUrl + "/api/products/{id}/decrement?qty={qty}";
+            ResponseEntity<Void> res = restTemplate.postForEntity(url, null, Void.class, productId, qty);
+        } catch (HttpClientErrorException e) {
+            String msg = e.getResponseBodyAsString();
+            throw new InvalidOrderException("Failed to reserve stock for product " + productId + ": " + msg);
+        }
     }
 
     public OrderResponse getOrderById(Long id) {
@@ -86,7 +108,7 @@ public class OrderService {
         return "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
-    private BigDecimal getMockPrice(String productId) {
+    private BigDecimal getMockPrice(Long productId) {
         return BigDecimal.valueOf(9.99);
     }
 

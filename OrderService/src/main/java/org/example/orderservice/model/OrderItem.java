@@ -12,7 +12,7 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String productId;
+    private Long productId;
     private Integer quantity;
     private BigDecimal price;
     private BigDecimal subtotal;
@@ -23,7 +23,7 @@ public class OrderItem {
 
     public OrderItem() {}
 
-    public OrderItem(String productId, Integer quantity, BigDecimal price) {
+    public OrderItem(Long productId, Integer quantity, BigDecimal price) { // updated constructor
         this.productId = productId;
         this.quantity = quantity;
         this.price = price;
@@ -32,7 +32,7 @@ public class OrderItem {
 
     public void setId(Long id) { this.id = id; }
 
-    public void setProductId(String productId) { this.productId = productId; }
+    public void setProductId(Long productId) { this.productId = productId; }
 
     public void setQuantity(Integer quantity) {
         this.quantity = quantity;
@@ -47,6 +47,4 @@ public class OrderItem {
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
 
     public void setOrder(Order order) { this.order = order; }
-
-
 }

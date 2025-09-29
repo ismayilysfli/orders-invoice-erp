@@ -4,8 +4,9 @@ import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
-import lombok.extern.slf4j.Slf4j;
 import org.example.orderservice.dto.OrderResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -14,8 +15,9 @@ import java.io.FileOutputStream;
 import java.time.format.DateTimeFormatter;
 
 @Service
-@Slf4j
-public class PdfService {
+public class PDFService {
+
+    private static final Logger log = LoggerFactory.getLogger(PDFService.class);
 
     @Value("${invoice.directory:/data/uploads/invoices}")
     private String invoiceDirectory;
@@ -27,7 +29,8 @@ public class PdfService {
                 dir.mkdirs();
             }
 
-            String fileName = "invoice_" + order.getOrderNumber() + ".pdf";
+            String orderNumber = order.getOrderNumber() == null ? String.valueOf(order.getId()) : order.getOrderNumber();
+            String fileName = "invoice_" + orderNumber + ".pdf";
             String filePath = invoiceDirectory + File.separator + fileName;
 
             Document document = new Document();
@@ -42,11 +45,12 @@ public class PdfService {
             document.add(Chunk.NEWLINE);
 
             Font detailsFont = FontFactory.getFont(FontFactory.HELVETICA, 12, BaseColor.BLACK);
-            document.add(new Paragraph("Invoice Number: " + order.getOrderNumber(), detailsFont));
-            document.add(new Paragraph("Order Date: " +
-                    order.getOrderDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), detailsFont));
-            document.add(new Paragraph("Customer: " + order.getCustomerName(), detailsFont));
-            document.add(new Paragraph("Email: " + order.getCustomerEmail(), detailsFont));
+            document.add(new Paragraph("Invoice Number: " + orderNumber, detailsFont));
+            if (order.getOrderDate() != null) {
+                document.add(new Paragraph("Order Date: " +
+                        order.getOrderDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), detailsFont));
+            }
+            document.add(new Paragraph("Customer ID: " + order.getCustomerId(), detailsFont));
 
             document.add(Chunk.NEWLINE);
 
@@ -56,10 +60,10 @@ public class PdfService {
             table.setSpacingAfter(10f);
 
             Font tableHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.WHITE);
-            PdfPCell header1 = new PdfPCell(new Phrase("Product", tableHeaderFont));
+            PdfPCell header1 = new PdfPCell(new Phrase("Product ID", tableHeaderFont));
             PdfPCell header2 = new PdfPCell(new Phrase("Quantity", tableHeaderFont));
             PdfPCell header3 = new PdfPCell(new Phrase("Unit Price", tableHeaderFont));
-            PdfPCell header4 = new PdfPCell(new Phrase("Total", tableHeaderFont));
+            PdfPCell header4 = new PdfPCell(new Phrase("Line Total", tableHeaderFont));
 
             header1.setBackgroundColor(BaseColor.DARK_GRAY);
             header2.setBackgroundColor(BaseColor.DARK_GRAY);
@@ -72,12 +76,14 @@ public class PdfService {
             table.addCell(header4);
 
             Font tableFont = FontFactory.getFont(FontFactory.HELVETICA, 11, BaseColor.BLACK);
-            order.getItems().forEach(item -> {
-                table.addCell(new Phrase(item.getProductName(), tableFont));
-                table.addCell(new Phrase(item.getQuantity().toString(), tableFont));
-                table.addCell(new Phrase("$" + item.getUnitPrice(), tableFont));
-                table.addCell(new Phrase("$" + item.getTotalPrice(), tableFont));
-            });
+            if (order.getItems() != null) {
+                order.getItems().forEach(item -> {
+                    table.addCell(new Phrase(String.valueOf(item.getProductId()), tableFont));
+                    table.addCell(new Phrase(String.valueOf(item.getQuantity()), tableFont));
+                    table.addCell(new Phrase("$" + item.getPrice(), tableFont));
+                    table.addCell(new Phrase("$" + item.getSubtotal(), tableFont));
+                });
+            }
 
             document.add(table);
 

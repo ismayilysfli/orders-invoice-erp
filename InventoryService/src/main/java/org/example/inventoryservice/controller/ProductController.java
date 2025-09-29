@@ -57,4 +57,10 @@ public class ProductController {
     public void deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
     }
+
+    @PostMapping("/{id}/decrement")
+    @ResponseStatus(HttpStatus.OK)
+    public ProductResponse decrement(@PathVariable Long id, @RequestParam int qty) {
+        return productService.decrementStock(id, qty);
+    }
 }

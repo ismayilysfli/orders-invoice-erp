@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class OrderItemResponse {
     private Long id;
-    private String productId;
+    private Long productId;
     private Integer quantity;
     private BigDecimal price;
     private BigDecimal subtotal;

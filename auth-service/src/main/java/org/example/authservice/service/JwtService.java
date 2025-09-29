@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 import java.util.function.Function;
+import java.util.List;
 
 @Service
 public class JwtService {
@@ -45,7 +46,10 @@ public class JwtService {
     private io.jsonwebtoken.JwtBuilder baseBuilder(User user) {
         return Jwts.builder()
                 .setSubject(user.getEmail())
-                .claim("role", user.getRole().toString())
+                .setIssuer("erp-platform")
+                .claim("userId", user.getId() == null ? null : user.getId().toString())
+                .claim("roles", List.of(user.getRole().toString()))
+                .claim("role", user.getRole().toString()) // backward compatibility
                 .setIssuedAt(new Date())
                 .signWith(getSigningKey());
     }
